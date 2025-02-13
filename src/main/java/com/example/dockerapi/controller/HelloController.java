@@ -9,6 +9,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.Map;
 
@@ -45,6 +48,83 @@ public class HelloController {
             return ResponseEntity.ok(user);
         } catch (EmptyResultDataAccessException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+    }
+    // POST: ユーザー新規作成
+    @GetMapping("/users")
+    public ResponseEntity<?> createUser(@RequestBody Map<String, String> request) {
+        try {
+            String name = request.get("name");
+            String email = request.get("email");
+
+            if (name == null || email == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Name and email are required");
+            }
+
+            String sql = "INSERT INTO demo.users (name, email) VALUES (?, ?)";
+            jdbcTemplate.update(sql, name, email);
+
+            String selectSql = "SELECT id FROM demo.users WHERE name = ? AND email = ? ORDER BY id DESC LIMIT 1";
+            Long newUserId = jdbcTemplate.queryForObject(selectSql, Long.class, name, email);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "id", newUserId,
+                "name", name,
+                "email", email
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error creating user");
+        }
+    }
+
+    // PUT: ユーザー情報更新
+    @PutMapping("/users/{user_id}")
+    public ResponseEntity<?> updateUser(@PathVariable Long user_id, @RequestBody Map<String, String> request) {
+        try {
+            String name = request.get("name");
+            String email = request.get("email");
+
+            if (name == null || email == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Name and email are required");
+            }
+
+            String checkSql = "SELECT COUNT(*) FROM demo.users WHERE id = ?";
+            int count = jdbcTemplate.queryForObject(checkSql, Integer.class, user_id);
+
+            if (count == 0) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            }
+
+            String sql = "UPDATE demo.users SET name = ?, email = ? WHERE id = ?";
+            jdbcTemplate.update(sql, name, email, user_id);
+
+            return ResponseEntity.ok(Map.of(
+                "id", user_id,
+                "name", name,
+                "email", email
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating user");
+        }
+    }
+
+    // DELETE: ユーザー削除
+    @DeleteMapping("/users/{user_id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long user_id) {
+        try {
+            String checkSql = "SELECT COUNT(*) FROM demo.users WHERE id = ?";
+            int count = jdbcTemplate.queryForObject(checkSql, Integer.class, user_id);
+
+            if (count == 0) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            }
+
+            String sql = "DELETE FROM demo.users WHERE id = ?";
+            jdbcTemplate.update(sql, user_id);
+
+            return ResponseEntity.ok().body("User deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting user");
         }
     }
 }
